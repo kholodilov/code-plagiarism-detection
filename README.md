@@ -6,7 +6,7 @@ A Clojure app for parsing and tokenizing java source code.
 
 lein antlr
 
-lein run path/to/file.java
+lein run path/to/dir_with_java_files output_file
 
 ## License
 

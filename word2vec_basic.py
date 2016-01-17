@@ -18,6 +18,7 @@ from __future__ import print_function
 
 import tensorflow.python.platform
 
+import sys
 import collections
 import math
 import numpy as np
@@ -28,37 +29,22 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import zipfile
 
-# Step 1: Download the data.
-url = 'http://mattmahoney.net/dc/'
+filename = sys.argv[1]
+vocabulary_size = int(sys.argv[2])
+learning_rate = float(sys.argv[3])
+training_steps = int(sys.argv[4])
 
-def maybe_download(filename, expected_bytes):
-  """Download a file if not present, and make sure it's the right size."""
-  if not os.path.exists(filename):
-    filename, _ = urllib.request.urlretrieve(url + filename, filename)
-  statinfo = os.stat(filename)
-  if statinfo.st_size == expected_bytes:
-    print('Found and verified', filename)
-  else:
-    print(statinfo.st_size)
-    raise Exception(
-        'Failed to verify ' + filename + '. Can you get to it with a browser?')
-  return filename
-
-filename = maybe_download('text8.zip', 31344016)
-
+# Step 1: Read the data.
 
 # Read the data into a string.
 def read_data(filename):
-  f = zipfile.ZipFile(filename)
-  for name in f.namelist():
-    return f.read(name).split()
-  f.close()
+  with open(filename) as f:
+    return f.read().split()
 
 words = read_data(filename)
 print('Data size', len(words))
 
 # Step 2: Build the dictionary and replace rare words with UNK token.
-vocabulary_size = 50000
 
 def build_dataset(words):
   count = [['UNK', -1]]
@@ -127,7 +113,7 @@ num_skips = 2         # How many times to reuse an input to generate a label.
 # We pick a random validation set to sample nearest neighbors. Here we limit the
 # validation samples to the words that have a low numeric ID, which by
 # construction are also the most frequent.
-valid_size = 16     # Random set of words to evaluate similarity on.
+valid_size = 100     # Random set of words to evaluate similarity on.
 valid_window = 100  # Only pick dev samples in the head of the distribution.
 valid_examples = np.array(random.sample(np.arange(valid_window), valid_size))
 num_sampled = 64    # Number of negative examples to sample.
@@ -161,8 +147,8 @@ with graph.as_default():
       tf.nn.nce_loss(nce_weights, nce_biases, embed, train_labels,
                      num_sampled, vocabulary_size))
 
-  # Construct the SGD optimizer using a learning rate of 1.0.
-  optimizer = tf.train.GradientDescentOptimizer(1.0).minimize(loss)
+  # Construct the SGD optimizer.
+  optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
 
   # Compute the cosine similarity between minibatch examples and all embeddings.
   norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
@@ -173,7 +159,6 @@ with graph.as_default():
       valid_embeddings, normalized_embeddings, transpose_b=True)
 
 # Step 5: Begin training.
-num_steps = 100001
 
 with tf.Session(graph=graph) as session:
   # We must initialize all variables before we use them.
@@ -181,7 +166,7 @@ with tf.Session(graph=graph) as session:
   print("Initialized")
 
   average_loss = 0
-  for step in xrange(num_steps):
+  for step in xrange(training_steps):
     batch_inputs, batch_labels = generate_batch(
         batch_size, num_skips, skip_window)
     feed_dict = {train_inputs : batch_inputs, train_labels : batch_labels}
@@ -232,11 +217,19 @@ def plot_with_labels(low_dim_embs, labels, filename='tsne.png'):
 try:
   from sklearn.manifold import TSNE
   import matplotlib.pyplot as plt
+  import numpy
+
+  plot_only = 200
+  embeddings_to_plot = final_embeddings[:plot_only,:]
+  labels = [reverse_dictionary[i] for i in xrange(plot_only)]
+
+  numpy.savetxt("embeddings.csv", embeddings_to_plot, delimiter=",")
+  with open("labels.csv", "w") as labels_file:
+    for label in labels:
+      labels_file.write("%s\n" % label)
 
   tsne = TSNE(perplexity=30, n_components=2, init='pca', n_iter=5000)
-  plot_only = 500
-  low_dim_embs = tsne.fit_transform(final_embeddings[:plot_only,:])
-  labels = [reverse_dictionary[i] for i in xrange(plot_only)]
+  low_dim_embs = tsne.fit_transform(embeddings_to_plot)
   plot_with_labels(low_dim_embs, labels)
 
 except ImportError:
