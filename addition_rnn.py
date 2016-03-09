@@ -147,6 +147,13 @@ model.add(Activation('softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam')
 
 if len(sys.argv) > 1:
+    # python -i /source_model/java-tokens/addition_rnn.py
+    # model.save_weights('/source_model/addition_rnn.hdf5')
+
+    # python -i /source_model/java-tokens/addition_rnn.py /source_model/addition_rnn.hdf5
+    # from keras.utils.visualize_util import plot
+    # plot(model, to_file='/source_model/addition_rnn.png')
+
     model.load_weights(sys.argv[1])
 else:
     # Train the model each generation and show predictions against the validation dataset
@@ -154,6 +161,8 @@ else:
         print()
         print('-' * 50)
         print('Iteration', iteration)
+        # tensorboard --logdir=logs/1
+        # open http://<host>:6006
         model.fit(X_train, y_train, batch_size=BATCH_SIZE, nb_epoch=1,
                   validation_data=(X_val, y_val), show_accuracy=True,
                   callbacks=[TensorBoard(log_dir='./logs/' + str(iteration), histogram_freq=0)])
