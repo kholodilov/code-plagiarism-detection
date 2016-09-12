@@ -6,11 +6,11 @@ A Clojure app for parsing and tokenizing java source code.
 
 lein antlr
 
-lein run path/to/dir_with_java_files output_file
+lein run -i path/to/dir_with_java_files -o output_file
 
 It also supports glob expressions for path:
 
-lein run "path/to/dir_with_java_files/{subdir1,subdir2,subdir3}" output_file
+lein run -i "path/to/dir_with_java_files/{subdir1,subdir2,subdir3}" -o output_file
 
 ## License
 
