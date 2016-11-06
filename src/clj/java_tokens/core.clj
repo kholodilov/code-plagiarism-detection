@@ -1,7 +1,8 @@
 (ns java-tokens.core
   (:require [clojure.java.io :as io]
             [org.satta.glob :as glob]
-            [clojure.tools.cli :as cli])
+            [clojure.tools.cli :as cli]
+            [digest])
   (:import [java_tokens.java_lexer Java8Lexer]
            [org.antlr.v4.runtime ANTLRInputStream]))
 
@@ -10,16 +11,23 @@
    ["-o" "--output-file path" "Output path"]
    ["-n" "--name-suffix suffix" "File name suffix" :default ".java"]
    ["-e" "--end-of-program token" "End-of-program token" :default "#END_OF_PROGRAM#"]
-   ["-p" "--print-path" "Print file path"]])
+   ["-p" "--print-path" "Print file path"]
+   ["-t" "--print-tag" "Print tag consisting of file name and hash of file path"]])
 
 (defn -main [& args]
-  (let [{:keys [input-dirs output-file name-suffix end-of-program print-path]} (:options (cli/parse-opts args cli-options))]
+  (let [{:keys [input-dirs output-file name-suffix end-of-program print-path print-tag]} (:options (cli/parse-opts args cli-options))]
     (with-open [output (io/writer output-file)]
       (doseq [dir (glob/glob input-dirs)]
         (let [all-files (file-seq dir)
-              java-files (filter #(.endsWith (.getName %) name-suffix) all-files)]
+              java-files (filter (fn [f] (and (.endsWith (.getName f) name-suffix) (.isFile f))) all-files)]
           (doseq [[counter file] (map-indexed vector java-files)]
             (if (= 0 (mod counter 1000)) (println "Processing " counter "'s file: " (.getAbsolutePath file)))
+            (if print-tag (.write output 
+              (str 
+                (.getName file) 
+                "-" 
+                (.substring (digest/sha-1 (.getAbsolutePath file)) 0 8) 
+                " ")))
             (if print-path (.write output (str (.getAbsolutePath file) " ")))
             (let [lexer (Java8Lexer. (ANTLRInputStream. (slurp file)))
                   tokens (.getAllTokens lexer)]
